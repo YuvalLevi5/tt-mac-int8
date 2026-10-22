@@ -1,6 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles
+from cocotb.triggers import ClockCycles, FallingEdge
 
 
 @cocotb.test()
@@ -19,6 +19,8 @@ async def test_mac(dut):
     await ClockCycles(dut.clk, 2)
     dut.rst_n.value = 1
     await ClockCycles(dut.clk, 1)
+    # Sample outputs mid-cycle, safely away from the clock edge
+    await FallingEdge(dut.clk)
     assert dut.uo_out.value == 0
 
     async def push(a, w):
@@ -26,6 +28,7 @@ async def test_mac(dut):
         dut.ui_in.value = a & 0xFF
         dut.uio_in.value = w & 0xFF
         await ClockCycles(dut.clk, 1)
+        await FallingEdge(dut.clk)
 
     # 3*4 = 12
     await push(3, 4)
