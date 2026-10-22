@@ -1,40 +1,49 @@
-# SPDX-FileCopyrightText: © 2024 Tiny Tapeout
-# SPDX-License-Identifier: Apache-2.0
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles
 
 
 @cocotb.test()
-async def test_project(dut):
+async def test_mac(dut):
     dut._log.info("Start")
 
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, unit="us")
+    # 50 MHz clock (only for timing the test; the value is arbitrary here)
+    clock = Clock(dut.clk, 20, unit="ns")
     cocotb.start_soon(clock.start())
 
-    # Reset
-    dut._log.info("Reset")
+    # Reset: accumulator clears to 0 while rst_n is low
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0
     dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
+    await ClockCycles(dut.clk, 2)
     dut.rst_n.value = 1
-
-    dut._log.info("Test project behavior")
-
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
-
-    # Wait for one clock cycle to see the output values
     await ClockCycles(dut.clk, 1)
+    assert dut.uo_out.value == 0
 
-    # The following assersion is just an example of how to check the output values.
-    # Change it to match the actual expected output of your module:
-    assert dut.uo_out.value == 50
+    async def push(a, w):
+        """Present one operand/weight pair for exactly one clock cycle."""
+        dut.ui_in.value = a & 0xFF
+        dut.uio_in.value = w & 0xFF
+        await ClockCycles(dut.clk, 1)
 
-    # Keep testing the module by changing the input values, waiting for
-    # one or more clock cycles, and asserting the expected output values.
+    # 3*4 = 12
+    await push(3, 4)
+    assert dut.uo_out.value == 12
+
+    # 12 + (-2)*5 = 2
+    await push(-2, 5)
+    assert dut.uo_out.value == 2
+
+    # 2 + 10*10 = 102
+    await push(10, 10)
+    assert dut.uo_out.value == 102
+
+    # Reset again, then a negative sum: (-3)*4 = -12 -> low byte is 244
+    dut.rst_n.value = 0
+    await ClockCycles(dut.clk, 2)
+    dut.rst_n.value = 1
+    await push(-3, 4)
+    assert dut.uo_out.value == 244
+
+    dut._log.info("PASS")
