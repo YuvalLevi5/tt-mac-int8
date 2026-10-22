@@ -46,3 +46,6 @@ pinout:
   uio[5]: "w[5]"
   uio[6]: "w[6]"
   uio[7]: "w[7]"
+
+# Do not change!
+yaml_version: 6
